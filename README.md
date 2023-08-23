@@ -5,10 +5,10 @@ Un usuario desea recibir el código de HTML de cualquier página web y para eso 
 El código HTML de una página web, la que el usuario desee
 
 ## Transmisor:
-La información en binario se empaqueta con un "Header" y "Tail" antes de mandarlo al canal
+La información se convierte a binario y se empaqueta con un "Header" y "Tail" para poder mandarlo al canal
 
 ## Canal:
-El canal es un cable de cobre, con velocidad de pendiendo del ancho de banda y con ruido aleatorio en los datos. Se pueden corromper debido a una modificación aleatoria.
+El canal es un cable de cobre, con velocidad de pendiendo del ancho de banda y con ruido aleatorio en los datos. Se pueden corromper debido a una alteración aleatoria.
 
 ## Receptor: 
 Desempaqueta los datos revisando su "Header" y "Tail" y convierte el texto de binario a caracteres ASCII.
