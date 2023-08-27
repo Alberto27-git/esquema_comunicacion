@@ -1,20 +1,20 @@
 # Esquema de la comunicación
-Un usuario desea recibir el código de HTML de cualquier página web y para eso debe ingresar una URL para que el servidor le regrese el código.
+Un usuario desea recibir el código de HTML de cualquier página web y para eso debe ingresar una URL para que el servidor se lo regrese.
 
 ## Fuente de información:
-El código HTML de una página web, la que el usuario desee
+El código HTML de una página web, la que el usuario desee. El usuario proporcion la URL.
 
 ## Transmisor:
-La información se convierte a binario y se empaqueta con un "Header" y "Tail" para poder mandarlo al canal
+La información se convierte a binario, se divide por bytes para que se puedan enviar en base a la velocidad del canal y se empaquetan con un "Header" y "Tail". Tanto "Header" como "Tail" seran valores booleanos True para indicar un empaquetado exitoso. 
 
 ## Canal:
-El canal es un cable de cobre, con velocidad de pendiendo del ancho de banda y con ruido aleatorio en los datos. Se pueden corromper debido a una alteración aleatoria.
+El canal es un cable UTP de CAT3, con velocidad máxima de 10Mbps, que se ve interferida por la prescencia de ruido electromagnético (motor cercano), que provoca señal eléctrica diferente en la transmisión de datos y por lo tanto una distorsión en estos y que puede corromper el resultado final. Además esta interferencia puede provocar que la señal se reduzca por lo que en algunas ocasiones descargará con diferentes velocidades.
 
 ## Receptor: 
-Desempaqueta los datos revisando su "Header" y "Tail" y convierte el texto de binario a caracteres ASCII.
+Desempaqueta los datos revisando su "Header" y "Tail", en caso de encontrar un empaquetado no deseado se descartará el paquete completo. Aquí se convierte de binario a caracteres ASCII, para posteriormente mandarlo al Destino.
 
 ## Destino: 
-Se muestra al usuario el código HTML descargado
+El código HTML descargado se muestra al usuario.
 
 
 
