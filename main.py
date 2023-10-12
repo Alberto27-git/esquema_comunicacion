@@ -275,9 +275,11 @@ def main():
         tipo_codi = int(input())
         match tipo_codi:
             case 1:
-                transmisor = Transmisor(contenido, Binaria_normal("Binaria", True)  )
-                receptor = Receptor('', transmisor.metodo)
-                break
+                
+                #transmisor = Transmisor(contenido, Binaria_normal("Binaria", True)  )
+                #receptor = Receptor('', transmisor.metodo)
+                return print("MÉTODO FUERA DE USO")
+                
             case 2:
                 transmisor = Transmisor(contenido, Huffman("Huffman", False))
                 receptor = Receptor('', transmisor.metodo)
