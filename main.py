@@ -31,6 +31,7 @@ class Receptor:
         self.metodo = metodo
     
     def recibe_paquete(self, paquete):
+        #print(self.metodo.nombre, paquete.data )
         self.storage += paquete.data
         print("Bytes recibidos (acumulados) ", len(self.storage))
     
@@ -49,15 +50,16 @@ class Transmisor:
         #Se convierte el html descargado a binario
         bin_caracteres = self.metodo.texto_a_binario(self.contenido)
 
-        #El método 'codificsa' en base al método elegido por el usuario 
-        # y regresa el código generado y el árbol para descomprimir el mismo.
-        codificacion = self.metodo.genera_codigos(bin_caracteres)
+        #El método de clase 'genera_codigos' regresa el código generado 
+        # y el árbol para descomprimir el mismo.
+        codigo = self.metodo.genera_codigos(bin_caracteres)
 
         #Regresa el código del método usado en una cadena de texto
-        codigo = self.metodo.construye_codigo(codificacion, bin_caracteres)
+        if self.metodo.nombre != "RLE" and self.metodo.nombre != "Combinatoria Binaria":
+            codigo = self.metodo.construye_codigo(codigo, bin_caracteres)
 
         #Para poder enviarlo por paquetes es necesario convertir el código generado en una lista
-        codigo = self.metodo.cadena_binario_a_lista(codigo)
+        codigo = self.metodo.cadena_str_list(codigo)
                 
         ruido = Ruido(8,20,self.metodo.ruido)
         id_paquete = 0
@@ -92,17 +94,81 @@ class metodo_codificacion():
         return [byte for byte in contenido_bin.split(' ')]
     
     def binario_a_texto(self, texto):
-        return ''.join([ chr(int(byte, 2)) for byte in self.cadena_binario_a_lista(texto) ])
+        return ''.join([ chr(int(byte, 2)) for byte in self.cadena_str_list(texto) ])
 
-    def cadena_binario_a_lista(self, cadena_bin):
+    def cadena_str_list(self, cadena_bin):
         return [cadena_bin[i:i+8] for i in range(0, len(cadena_bin), 8)]
     
-    def construye_codigo(self, codificacion,lista_bytes):
+    def construye_codigo(self, codificacion, lista_bytes):
        return "".join([codificacion[char] for char in lista_bytes])
 
-class LZ77(metodo_codificacion):
+class Combinatoria_binaria(metodo_codificacion):
     def __init__(self, nombre, ruido):
         super().__init__(nombre, ruido)
+        self.arbol = {
+            "00": '1',
+            "01": '2',
+            "10": '3',
+            "11": '4',
+            "1": '5',
+            "0": '6'
+        }
+
+    def genera_codigos(self, msg):
+        msg = ''.join(msg)
+        codigo = []
+        for i in range(0, len(msg), 2):
+            par = msg[i:i+2]
+            codigo.append(self.arbol[par])
+
+        return ''.join(codigo)
+
+    def decodifica(self, codigo, arbol):
+        decodificado = ''
+
+        diccionario_invertido = {v: k for k, v in arbol.items()}
+        
+        for i in codigo:
+            decodificado += diccionario_invertido[i]
+
+        return self.binario_a_texto(decodificado)
+
+class RLE(metodo_codificacion):
+    def __init__(self, nombre, ruido):
+        super().__init__(nombre, ruido)
+        self.arbol = None
+    
+    def genera_codigos(self, message):
+        message = ''.join(message)
+        
+        encoded_message = ''
+        i = 0
+
+        while (i <= len(message)-1):
+            count = 1
+            ch = message[i]
+            j = i
+            while (j < len(message)-1):
+                if (message[j] == message[j+1]):
+                    count = count+1
+                    j = j+1
+                else:
+                    break
+            encoded_message = encoded_message+str(count)+ch
+            i = j+1
+        #print(encoded_message)
+        return encoded_message
+
+    def decodifica(self, encoded_msg, arbol):
+        texto_descomprimido = ""
+
+        for i in range(0, len(encoded_msg), 2):
+            if i + 1 < len(encoded_msg):
+                count = int(encoded_msg[i])
+
+                texto_descomprimido += encoded_msg[i+1] * count
+
+        return self.binario_a_texto(texto_descomprimido)
 
 class Huffman(metodo_codificacion):
 
@@ -144,7 +210,7 @@ class Huffman(metodo_codificacion):
 
         return mapping
     
-    def decodifica(self,texto_codificado, arbol):
+    def decodifica(self, texto_codificado, arbol):
         #Decodificación de Huffman (comprimido) a binario
         nodo_actual = arbol
         binario = ""
@@ -219,7 +285,8 @@ class Shannon_fano(metodo_codificacion):
         
         texto = self.binario_a_texto(binario)
         return texto
-    
+
+
 class Entropia:
     def __init__(self, total_paquetes_enviados, entropia_final, registro_ruido):
         self.total_paquetes_enviados = total_paquetes_enviados
@@ -243,7 +310,7 @@ class Canal:
     def envia_receptor(self, receptor, paquete, entropia, ruido):
         entropia.total_paquetes_enviados += 1
         print("Recibiendo...")
-        
+
         if ruido.aplicar:
             #Probabilidad de perder un paquete por ruido electromagnético
             if ruido.prob_afectar_datos():
@@ -288,18 +355,17 @@ class Destino:
 
 def crea_canal():
     
-    megabit_bytes = 500 #125000 #Cuanto equivale un megabit en bytes
+    megabit_bytes = 8000 #125000 #Cuanto equivale un megabit en bytes
     vel_actual = 1
-    vel_actual = round(vel_actual * megabit_bytes)    
+    vel_actual = round(vel_actual * megabit_bytes)
     return Canal(vel_actual)
 
 def main():
     #URLS de prueba
-    #website = "https://www.microsoft.com/es-mx/" #622 caracteres
-    #website = "https://octopus.mx" #un solo mensaje
-    #website = "https://www.python.org/" #variable 
-    #website = "https://openai.com/" #102,487
-    #website = "https://www.alamosinn.com/photo-albums" # 1,206,372
+    #website = "https://www.microsoft.com/es-mx/" #Pesa poco
+    
+    #website = "https://es.wikipedia.org/wiki/Wikipedia:Portada" #Peso medio
+    #website = "https://www.alamosinn.com/photo-albums" #Pesa mucho
     
     website = input("Ingresa url: ")
 
@@ -316,10 +382,13 @@ def main():
     time.sleep(1)
     canal = crea_canal()
 
-    siruido = bool(input("¿Quieres aplicar probabilidad de ruido? (True/False): "))
+    siruido = input("¿Quieres aplicar probabilidad de ruido? (True/False): ")
+    if siruido == "False":
+        siruido = False
+    else: siruido = True
 
     print("¿Que método de codificación usar?\
-          \n1.-Shannon fano\n2.-Huffman\n3.-LZ77\n4.-LZW")
+          \n1.-Shannon fano\n2.-Huffman\n3.-RLE (Más Lento)\n4.-Combinatoria Binaria")
 
     while(True):
         tipo_codi = int(input())
@@ -333,14 +402,13 @@ def main():
                 receptor = Receptor([], transmisor.metodo)
                 break
             case 3:
-                #transmisor = Transmisor(contenido, LZ77("Binaria", True)  )
-                #receptor = Receptor('', transmisor.metodo)
-                return print("MÉTODO NO DISPONIBLE")
+                transmisor = Transmisor(contenido, RLE("RLE", siruido)  )
+                receptor = Receptor([], transmisor.metodo)
+                break
             case 4:
-                #transmisor = Transmisor(contenido, LZW("Binaria", True)  )
-                #receptor = Receptor('', transmisor.metodo)
-                return print("MÉTODO NO DISPONIBLE")
-            
+                transmisor = Transmisor(contenido, Combinatoria_binaria("Combinatoria Binaria", siruido)  )
+                receptor = Receptor([], transmisor.metodo)
+                break
             case _:
                 print("Opción no válida. Elige otra: ")
     
