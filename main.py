@@ -31,7 +31,7 @@ class Receptor:
         self.metodo = metodo
     
     def recibe_paquete(self, paquete):
-        #print(self.metodo.nombre, paquete.data )
+        print(len(paquete.data))
         self.storage += paquete.data
         print("Bytes recibidos (acumulados) ", len(self.storage))
     
@@ -64,13 +64,16 @@ class Transmisor:
         ruido = Ruido(8,20,self.metodo.ruido)
         id_paquete = 0
 
+        adaptativa = codificacion_adaptativa()
+
         while codigo:
             paquete = Paquete(id_paquete, codigo[:canal.velocidad],id_paquete)
             del codigo[:canal.velocidad]
 
             #Empezar a transmitir por el canal por paquetes segun la velocidad
-            #la velocidad es la cantidad de bytes que se envian            
-            canal.envia_receptor(receptor, paquete, entropia, ruido)
+            #la velocidad es la cantidad de bytes que se envian
+            
+            adaptativa.envio_sin_perdida(receptor, paquete, entropia, ruido)
             id_paquete += 1
 
 
@@ -287,21 +290,25 @@ class Shannon_fano(metodo_codificacion):
         return texto
 
 
-class Entropia:
-    def __init__(self, total_paquetes_enviados, entropia_final, registro_ruido):
-        self.total_paquetes_enviados = total_paquetes_enviados
-        self.entropia_final = entropia_final
-        self.registro_ruido = registro_ruido
-    
-    def calcula_entropia(self):
-        print(self.total_paquetes_enviados, "Probabilidad de pérdida")
-        for i in range(0,len(self.registro_ruido)):
-            self.entropia_final += (1/self.total_paquetes_enviados) * math.log2(1/self.total_paquetes_enviados)
+class codificacion_adaptativa():
+    def __init__(self):
+        self.canales = [crea_canal() for _ in range(6)]
+        
+    def envio_sin_perdida(self, receptor, paquete, entropia, ruido):
+        canal_enviar = 5
+
+        while self.canales[canal_enviar].envia_receptor(receptor, paquete, entropia, ruido):
+            if canal_enviar + 1 < len(self.canales):
+                canal_enviar += 1
+            else:
+                canal_enviar = 0
+
+            self.limpia_receptor(receptor)
             
-        print("Entropia:", -self.entropia_final, )
-        print("Veces que ocurrió ruido: ", len(self.registro_ruido))
-        #calcular con las veces que se enviaron paquetes 
-        # y la cantidad de veces que cayó ruido
+            print("\n << Canal con ruido >> \n")
+
+    def limpia_receptor(self, receptor):
+        pass
 
 class Canal:
     def __init__(self, velocidad):
@@ -310,10 +317,11 @@ class Canal:
     def envia_receptor(self, receptor, paquete, entropia, ruido):
         entropia.total_paquetes_enviados += 1
         print("Recibiendo...")
-
+        aplicado_ruido = False
         if ruido.aplicar:
             #Probabilidad de perder un paquete por ruido electromagnético
             if ruido.prob_afectar_datos():
+                aplicado_ruido = True
                 paquete = ruido.genera_ruido(paquete)
                 entropia.registro_ruido.append(True)
                 
@@ -321,6 +329,23 @@ class Canal:
         #  de la probabilidad anterior y la codificación
         receptor.recibe_paquete(paquete)
         time.sleep(1)
+        return aplicado_ruido
+    
+class Entropia:
+        def __init__(self, total_paquetes_enviados, entropia_final, registro_ruido):
+            self.total_paquetes_enviados = total_paquetes_enviados
+            self.entropia_final = entropia_final
+            self.registro_ruido = registro_ruido
+        
+        def calcula_entropia(self):
+            print(self.total_paquetes_enviados, "Probabilidad de pérdida")
+            for i in range(0,len(self.registro_ruido)):
+                self.entropia_final += (1/self.total_paquetes_enviados) * math.log2(1/self.total_paquetes_enviados)
+                
+            print("Entropia:", -self.entropia_final )
+            print("Veces que ocurrió ruido: ", len(self.registro_ruido))
+            #calcular con las veces que se enviaron paquetes 
+            # y la cantidad de veces que cayó ruido
 
 class Ruido:
     def __init__(self, umbral, rango_max, aplicar):
@@ -355,19 +380,20 @@ class Destino:
 
 def crea_canal():
     
-    megabit_bytes = 8000 #125000 #Cuanto equivale un megabit en bytes
+    megabit_bytes = 10000 #125000 #Cuanto equivale un megabit en bytes
     vel_actual = 1
     vel_actual = round(vel_actual * megabit_bytes)
     return Canal(vel_actual)
 
 def main():
     #URLS de prueba
-    #website = "https://www.microsoft.com/es-mx/" #Pesa poco
+    website = "https://www.microsoft.com/es-mx/" #Pesa poco
     
     #website = "https://es.wikipedia.org/wiki/Wikipedia:Portada" #Peso medio
+
     #website = "https://www.alamosinn.com/photo-albums" #Pesa mucho
     
-    website = input("Ingresa url: ")
+    #website = input("Ingresa url: ")
 
     #Web scraping de la URL del usuario
     print(f"Buscando en la web... {website}    \n")
@@ -417,6 +443,7 @@ def main():
     recibido = receptor.decodificacion()
     #Finalmente muestro al usuario el resultado
     destino = Destino(recibido)
+
     destino.muestra_transmision_recibida()
     entropia.calcula_entropia()
 main()
