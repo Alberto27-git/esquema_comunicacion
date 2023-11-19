@@ -6,7 +6,6 @@ Alberto Ortíz López
 import requests
 from bs4 import BeautifulSoup
 import time
-import math
 from random import randint, shuffle
 import heapq
 
@@ -29,12 +28,56 @@ class Receptor:
     def __init__(self, storage, metodo):
         self.storage = storage
         self.metodo = metodo
+        self.lista_hashes = None
+        self.hashes = None
     
+    def configura_hashes(self):
+        self.hashes, self.lista_hashes = self.hashea()
+        self.lista_hashes.sort()
+
     def recibe_paquete(self, paquete):
+        
+        if self.metodo.nombre == "Combinatoria Binaria":
+            paq_sin_hashes = []
+
+            for i in paquete.data:
+                coincidencia = self.busqueda_binaria(self.lista_hashes, i)
+                paq_sin_hashes.append(self.hashes[coincidencia])
+                
+        #Recepción de paquete
         print(len(paquete.data))
-        self.storage += paquete.data
+        self.storage += paquete.data if self.metodo.nombre != "Combinatoria Binaria" else paq_sin_hashes
         print("Bytes recibidos (acumulados) ", len(self.storage))
     
+    def hashea(self):
+        hashes =  {(hash(value)): value for _ , value in self.metodo.arbol.items()}
+        return hashes, [key for key in hashes]
+
+    def hash_coincide(self, num1, num2):
+        return abs(num1 - num2) == 1
+
+    def busqueda_binaria(self, lista, elemento):
+        # Inicializamos los índices izquierdo y derecho
+        izquierda = 0
+        derecha = len(lista) - 1
+
+        while izquierda <= derecha:
+            # Encontramos el punto medio del arreglo
+            medio = (izquierda + derecha) // 2
+
+            # Revisamos si el elemento "coincide" con otro hash (verificar hashes)
+            if self.hash_coincide(lista[medio], elemento):
+                return lista[medio]
+            # Si el elemento está en la mitad derecha del arreglo
+            elif lista[medio] < elemento:
+                izquierda = medio + 1
+            # Si el elemento está en la mitad izquierda del arreglo
+            else:
+                derecha = medio - 1
+
+        # Si el elemento no está presente en el arreglo
+        return -1
+
     def decodificacion(self):
         return self.metodo.decodifica("".join(self.storage), self.metodo.arbol)
 
@@ -43,7 +86,8 @@ class Transmisor:
         self.contenido = contenido
         self.metodo = metodo
 
-    def transmite(self, receptor, canal, entropia):
+    def transmite(self, receptor, canal):
+
         print(f"-- Codificación {self.metodo.nombre} --")
         time.sleep(1)
         
@@ -59,23 +103,28 @@ class Transmisor:
             codigo = self.metodo.construye_codigo(codigo, bin_caracteres)
 
         #Para poder enviarlo por paquetes es necesario convertir el código generado en una lista
-        codigo = self.metodo.cadena_str_list(codigo)
-                
-        ruido = Ruido(8,20,self.metodo.ruido)
-        id_paquete = 0
+        if self.metodo.nombre == "Combinatoria Binaria":
+            codigo = list(codigo)
+            receptor.configura_hashes()
+        else: 
+            codigo = self.metodo.cadena_str_list(codigo)
 
+        ruido = Ruido(8,20,self.metodo.ruido)
         adaptativa = codificacion_adaptativa()
+        id_paquete = 0
 
         while codigo:
             paquete = Paquete(id_paquete, codigo[:canal.velocidad],id_paquete)
+            if self.metodo.nombre == "Combinatoria Binaria":
+                paquete.data = paquete.hashea()
+
             del codigo[:canal.velocidad]
 
             #Empezar a transmitir por el canal por paquetes segun la velocidad
-            #la velocidad es la cantidad de bytes que se envian
+            #la velocidad es la cantidad de bytes que se envian            
             
-            adaptativa.envio_sin_perdida(receptor, paquete, entropia, ruido)
+            adaptativa.envio_sin_perdida(receptor, paquete, ruido)
             id_paquete += 1
-
 
 class metodo_codificacion():
     def __init__(self, nombre, ruido):
@@ -159,7 +208,7 @@ class RLE(metodo_codificacion):
                     break
             encoded_message = encoded_message+str(count)+ch
             i = j+1
-        #print(encoded_message)
+        
         return encoded_message
 
     def decodifica(self, encoded_msg, arbol):
@@ -270,13 +319,13 @@ class Shannon_fano(metodo_codificacion):
         for caracter, codigo in codigo_grupo2.items():
             codigo_final[caracter] = '1' + codigo
         
-        self.arbol = codigo_final
+        self.arbol = codigo_final        
         return codigo_final
     
     def decodifica(self, codigo, codigo_shannon_fano):
         binario = ""
         # Invertir el diccionario de códigos
-        codigo_inverso = {v: k for k, v in codigo_shannon_fano.items()}  
+        codigo_inverso = {v: k for k, v in codigo_shannon_fano.items()}
 
         codigo_actual = ""
         for bit in codigo:
@@ -289,63 +338,40 @@ class Shannon_fano(metodo_codificacion):
         texto = self.binario_a_texto(binario)
         return texto
 
-
 class codificacion_adaptativa():
     def __init__(self):
         self.canales = [crea_canal() for _ in range(6)]
         
-    def envio_sin_perdida(self, receptor, paquete, entropia, ruido):
+    def envio_sin_perdida(self, receptor, paquete, ruido):
         canal_enviar = 5
 
-        while self.canales[canal_enviar].envia_receptor(receptor, paquete, entropia, ruido):
+        while self.canales[canal_enviar].envia_receptor(receptor, paquete, ruido):
+            print("\n << Canal con ruido >> \n")
+            
             if canal_enviar + 1 < len(self.canales):
                 canal_enviar += 1
             else:
                 canal_enviar = 0
-
-            self.limpia_receptor(receptor)
-            
-            print("\n << Canal con ruido >> \n")
-
-    def limpia_receptor(self, receptor):
-        pass
+    
+            print(f"\n << Cambiando al canal: {canal_enviar} >>")
+            time.sleep(1)
 
 class Canal:
     def __init__(self, velocidad):
         self.velocidad = velocidad
     
-    def envia_receptor(self, receptor, paquete, entropia, ruido):
-        entropia.total_paquetes_enviados += 1
+    def envia_receptor(self, receptor, paquete, ruido):
         print("Recibiendo...")
-        aplicado_ruido = False
+
         if ruido.aplicar:
             #Probabilidad de perder un paquete por ruido electromagnético
             if ruido.prob_afectar_datos():
-                aplicado_ruido = True
+                return True
                 paquete = ruido.genera_ruido(paquete)
-                entropia.registro_ruido.append(True)
-                
-        #Envia el paquete con o sin ruido dependiendo
-        #  de la probabilidad anterior y la codificación
-        receptor.recibe_paquete(paquete)
-        time.sleep(1)
-        return aplicado_ruido
-    
-class Entropia:
-        def __init__(self, total_paquetes_enviados, entropia_final, registro_ruido):
-            self.total_paquetes_enviados = total_paquetes_enviados
-            self.entropia_final = entropia_final
-            self.registro_ruido = registro_ruido
-        
-        def calcula_entropia(self):
-            print(self.total_paquetes_enviados, "Probabilidad de pérdida")
-            for i in range(0,len(self.registro_ruido)):
-                self.entropia_final += (1/self.total_paquetes_enviados) * math.log2(1/self.total_paquetes_enviados)
-                
-            print("Entropia:", -self.entropia_final )
-            print("Veces que ocurrió ruido: ", len(self.registro_ruido))
-            #calcular con las veces que se enviaron paquetes 
-            # y la cantidad de veces que cayó ruido
+            else:
+                #Envia paquete ya que no hay ruido
+                receptor.recibe_paquete(paquete)
+                time.sleep(1)
 
 class Ruido:
     def __init__(self, umbral, rango_max, aplicar):
@@ -369,6 +395,9 @@ class Paquete:
         self.header = header
         self.data = data
         self.tail = tail
+    
+    def hashea(self):
+        return [ (hash(i) + 1 ) for i in self.data]
 
 class Destino:
     def __init__(self, html):
@@ -380,41 +409,40 @@ class Destino:
 
 def crea_canal():
     
-    megabit_bytes = 10000 #125000 #Cuanto equivale un megabit en bytes
+    megabit_bytes = 1000 #125000 #Cuanto equivale un megabit en bytes
     vel_actual = 1
     vel_actual = round(vel_actual * megabit_bytes)
     return Canal(vel_actual)
 
 def main():
     #URLS de prueba
-    website = "https://www.microsoft.com/es-mx/" #Pesa poco
+    #website = "https://octopus.mx/"
+
+    #website = "https://www.microsoft.com/es-mx/" #Pesa poco
     
     #website = "https://es.wikipedia.org/wiki/Wikipedia:Portada" #Peso medio
 
     #website = "https://www.alamosinn.com/photo-albums" #Pesa mucho
     
-    #website = input("Ingresa url: ")
+    website = input("Ingresa url: ")
 
     #Web scraping de la URL del usuario
     print(f"Buscando en la web... {website}    \n")
     fuente = Fuente_informacion(website)
 
     print("Iniciando descarga...\n")
-    contenido = fuente.descarga_info()
-    #Creo el objeto entropia para guardar un registro en el canal
-    entropia = Entropia(0, 0, [])
+    contenido = fuente.descarga_info() 
     
     print("Contenctando...")
     time.sleep(1)
     canal = crea_canal()
 
-    siruido = input("¿Quieres aplicar probabilidad de ruido? (True/False): ")
-    if siruido == "False":
-        siruido = False
-    else: siruido = True
+    print("El esquema se verá afectado por ruido...")
+    time.sleep(1)
+    siruido = True
 
     print("¿Que método de codificación usar?\
-          \n1.-Shannon fano\n2.-Huffman\n3.-RLE (Más Lento)\n4.-Combinatoria Binaria")
+          \n1.-Shannon fano\n2.-Huffman\n3.-RLE (Más Lento)\n4.-Combinatoria Binaria (Hasheado)")
 
     while(True):
         tipo_codi = int(input())
@@ -438,12 +466,14 @@ def main():
             case _:
                 print("Opción no válida. Elige otra: ")
     
-    transmisor.transmite(receptor, canal, entropia)
+    transmisor.transmite(receptor, canal)
 
     recibido = receptor.decodificacion()
+    print("recibido", len(recibido))
+    
     #Finalmente muestro al usuario el resultado
     destino = Destino(recibido)
-
+    
     destino.muestra_transmision_recibida()
-    entropia.calcula_entropia()
+
 main()
