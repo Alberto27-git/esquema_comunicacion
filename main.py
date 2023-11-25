@@ -43,7 +43,7 @@ class Receptor:
             for i in paquete.data:
                 coincidencia = self.busqueda_binaria(self.lista_hashes, i)
                 paq_sin_hashes.append(self.hashes[coincidencia])
-                
+
         #Recepción de paquete
         print(len(paquete.data))
         self.storage += paquete.data if self.metodo.nombre != "Combinatoria Binaria" else paq_sin_hashes
@@ -52,9 +52,6 @@ class Receptor:
     def hashea(self):
         hashes =  {(hash(value)): value for _ , value in self.metodo.arbol.items()}
         return hashes, [key for key in hashes]
-
-    def hash_coincide(self, num1, num2):
-        return abs(num1 - num2) == 1
 
     def busqueda_binaria(self, lista, elemento):
         # Inicializamos los índices izquierdo y derecho
@@ -66,7 +63,7 @@ class Receptor:
             medio = (izquierda + derecha) // 2
 
             # Revisamos si el elemento "coincide" con otro hash (verificar hashes)
-            if self.hash_coincide(lista[medio], elemento):
+            if lista[medio] == elemento:
                 return lista[medio]
             # Si el elemento está en la mitad derecha del arreglo
             elif lista[medio] < elemento:
@@ -397,7 +394,7 @@ class Paquete:
         self.tail = tail
     
     def hashea(self):
-        return [ (hash(i) + 1 ) for i in self.data]
+        return [ (hash(i)) for i in self.data]
 
 class Destino:
     def __init__(self, html):
