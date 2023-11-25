@@ -16,6 +16,8 @@ Desempaqueta los datos revisando su "Header" y "Tail", en caso de encontrar un e
 ## Destino: 
 El código HTML descargado se muestra al usuario.
 
+## Hashes y búsqueda binaria
+Para el método de codificación "Combinatoria Binaria", se buscan los hashes con el método "búsqueda binaria" que resulta más eficiente que buscar en todo un arreglo
 
 
 
